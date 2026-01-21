@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# ---------------------------------------------------------
-# পেজ কনফিগারেশন
-# ---------------------------------------------------------
+# Page Configuration
 st.set_page_config(page_title="Global Health Analytics", layout="wide")
 
+# Custom CSS styling
 st.markdown("""
     <style>
     .main { background-color: #F0F2F6; }
@@ -20,15 +19,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# ডেটা লোডিং
-# ---------------------------------------------------------
+# Data Loading and Processing Function
 @st.cache_data
 def load_data():
     countries = pd.read_csv("countries of the world.csv")
     life = pd.read_csv("Life Expectancy Data.csv")
     
-    # Cleaning
+    # Data Cleaning
     countries.columns = countries.columns.str.strip().str.lower()
     life.columns = life.columns.str.strip().str.lower()
     countries["country"] = countries["country"].str.strip().str.lower()
@@ -46,29 +43,23 @@ def load_data():
 
 df = load_data()
 
-# ---------------------------------------------------------
-# সাইডবার এবং টাইটেল
-# ---------------------------------------------------------
+# Sidebar Configuration
 with st.sidebar:
-    st.header("⚙️ Dashboard Settings")
-    selected_region = st.selectbox("Select Region (Global Filter)", df['region'].unique())
-    st.info("💡 **Brushing & Linking Enabled:** Select points on the 'GDP vs Life Expectancy' chart to filter other charts!")
+    st.header("Dashboard Settings")
+    selected_region = st.selectbox("Select Region", df['region'].unique())
+    st.info("Interactive Feature: Select points on the GDP chart to filter details across the dashboard.")
 
-# রিজিয়ন ফিল্টার (Global)
+# Filter Data based on Region
 region_df = df[df['region'] == selected_region]
 
-st.title(f"🌍 {selected_region} Analysis & Interaction")
-st.write("Use the **Box Select** or **Lasso Select** tool on the first chart to filter the others.")
+# Main Title
+st.title(f"Global Health Analytics: {selected_region}")
+st.write("Analyze the relationship between GDP, Life Expectancy, and Mortality. Use the selection tool on the first chart for deep-dive analysis.")
 
-# ---------------------------------------------------------
-# ভিজ্যুয়ালাইজেশন ও লিঙ্কিং লজিক
-# ---------------------------------------------------------
-
-# সারি ১: স্ক্যাটার প্লট (যেখানে সিলেকশন হবে) এবং ইনফ্যান্ট মর্টালিটি
+# Layout: Row 1
 col1, col2 = st.columns(2)
 
 with col1:
-    # PLOT 1: SOURCE CHART (সিলেকশন সোর্স)
     fig1 = px.scatter(
         region_df, 
         x="gdp ($ per capita)", 
@@ -78,42 +69,38 @@ with col1:
         color_continuous_scale="Viridis",
         hover_name="country",
         log_x=True, 
-        title="1. GDP vs Life Expectancy (Select Here!)",
+        title="GDP vs Life Expectancy (Interactive Selection)",
         template="plotly_white"
     )
-    # এই লাইনটি সিলেকশন ইভেন্ট হ্যান্ডেল করবে
+    # Selection Logic
     selection = st.plotly_chart(fig1, use_container_width=True, on_select="rerun", selection_mode="points")
 
-# --- লিঙ্কিং লজিক ---
-# যদি কেউ চার্টে দেশ সিলেক্ট করে, তাহলে filtered_df আপডেট হবে, না হলে পুরো region_df থাকবে
+# Brushing & Linking Logic
 if selection and len(selection["selection"]["point_indices"]) > 0:
     selected_indices = selection["selection"]["point_indices"]
-    # রিজিয়ন ডেটা থেকে ইনডেক্স অনুযায়ী ফিল্টার করা
     linked_df = region_df.iloc[selected_indices]
-    st.success(f"Linked View: Showing data for {len(linked_df)} selected countries.")
+    st.success(f"Displaying analysis for {len(linked_df)} selected countries.")
 else:
-    linked_df = region_df # কেউ কিছু সিলেক্ট না করলে সব দেখাবে
+    linked_df = region_df
 
-# এখন বাকি চার্টগুলো linked_df ব্যবহার করবে
 with col2:
     fig2 = px.scatter(
-        linked_df, # আপডেটেড ডেটা
+        linked_df, 
         x="infant deaths", 
         y="life expectancy", 
         size="population_density",
         color="infant deaths",
         color_continuous_scale="Reds",
         hover_name="country",
-        title="2. Infant Mortality (Updates based on selection)",
+        title="Infant Mortality Analysis",
         template="plotly_white"
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-# সারি ২: বার চার্ট এবং হিস্টোগ্রাম
+# Layout: Row 2
 col3, col4 = st.columns(2)
 
 with col3:
-    # টপ ১০ (সিলেকশন অনুযায়ী আপডেট হবে)
     if len(linked_df) > 0:
         top_data = linked_df.nlargest(10, 'life expectancy').sort_values('life expectancy', ascending=True)
         fig3 = px.bar(
@@ -123,21 +110,21 @@ with col3:
             orientation='h',
             color="life expectancy",
             color_continuous_scale="Sunsetdark",
-            title="3. Top Selected Countries",
+            title="Top Countries by Life Expectancy",
             template="plotly_white",
             text_auto='.1f'
         )
         fig3.update_layout(showlegend=False)
         st.plotly_chart(fig3, use_container_width=True)
     else:
-        st.warning("No data selected.")
+        st.warning("No countries selected.")
 
 with col4:
     fig4 = px.histogram(
-        linked_df, # আপডেটেড ডেটা
+        linked_df, 
         x="life expectancy", 
         nbins=15,
-        title="4. Life Expectancy Distribution (Updates based on selection)",
+        title="Life Expectancy Distribution",
         color_discrete_sequence=['#636EFA'],
         template="plotly_white"
     )
